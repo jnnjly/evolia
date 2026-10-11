@@ -105,6 +105,12 @@ android {
                 }
             }
         }
+         getByName("debug") {
+    storeFile = rootProject.file(System.getProperty("user.home") + "/.android/debug.keystore")
+    storePassword = "android"
+    keyAlias = "androiddebugkey"
+    keyPassword = "android"
+}
     }
 
     // 自动修复无效的外部签名注入
