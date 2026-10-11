@@ -80,5 +80,5 @@ dependencies {
     //      如果 libs 目录不存在就手动建一个
     //
     // 用 api 暴露给上层模块（app / tts 等都能直接 import org.webrtc.*）
-    api("io.getstream:stream-webrtc-android:1.3.9")
+    api("io.github.webrtc-sdk:android:137.7151.01")
 }
