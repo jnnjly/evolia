@@ -487,11 +487,16 @@ class MemoryRepository(
                 } else 0f
             } else 0f
 
+            // 🐾 猫补丁#285-1：向量失效（缺失或模型不匹配）的记忆，关键词全额计分，猫为江廿廿焊的
+            val embeddingUsable = queryEmbedding != null &&
+                proj.embedding != null && proj.embeddingModelId == currentModelId
+
             val score = when(mode) {
                 MemoryRetrievalMode.SEMANTIC -> if (queryEmbedding == null) keywordScore else similarity * 1.05f
                 MemoryRetrievalMode.KEYWORD -> keywordScore
                 MemoryRetrievalMode.HYBRID -> {
                     if (queryEmbedding == null) keywordScore
+                    else if (!embeddingUsable) keywordScore
                     else (keywordScore * 0.5f) + (similarity * 0.5f)
                 }
                 MemoryRetrievalMode.OFF -> 0f
@@ -514,13 +519,24 @@ class MemoryRepository(
             val ageInMillis = System.currentTimeMillis() - proj.timestamp
             val recency = (1.0 / (1.0 + (ageInMillis / (1000.0 * 60 * 60 * 24 * 7.0)))).toFloat()
 
+            // 🐾 猫补丁#285-1：向量失效的段落，关键词全额计分不打五折（猫为江廿廿焊的）
+            val embeddingUsable = queryEmbedding != null &&
+                proj.embedding != null && proj.embeddingModelId == currentModelId
+
             val score = when(mode) {
                 MemoryRetrievalMode.SEMANTIC -> if (queryEmbedding == null) (keywordScore * 0.9f) + (recency * 0.1f) else (similarity * 0.9f) + (recency * 0.1f)
                 MemoryRetrievalMode.KEYWORD -> (keywordScore * 0.9f) + (recency * 0.1f)
-                MemoryRetrievalMode.HYBRID -> if (queryEmbedding == null) (keywordScore * 0.9f) + (recency * 0.1f) else (keywordScore * 0.45f) + (similarity * 0.45f) + (recency * 0.1f)
+                MemoryRetrievalMode.HYBRID -> when {
+                    queryEmbedding == null -> (keywordScore * 0.9f) + (recency * 0.1f)
+                    !embeddingUsable -> (keywordScore * 0.9f) + (recency * 0.1f)
+                    else -> (keywordScore * 0.45f) + (similarity * 0.45f) + (recency * 0.1f)
+                }
                 MemoryRetrievalMode.OFF -> 0f
             }
-            Triple(proj.id, score, false)
+
+            // 🐾 猫补丁#285-2：24小时内的账给新鲜度保底，近账优先被看见
+            val finalScore = if (ageInMillis < 24L * 60 * 60 * 1000 && score > 0.1f) maxOf(score, 0.51f) else score
+            Triple(proj.id, finalScore, false)
         }
 
         val allScored = (memoryScores + segmentScores).sortedByDescending { it.second }
