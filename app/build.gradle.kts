@@ -106,22 +106,20 @@ android {
             }
         }
          getByName("debug") {
-    val fixedKs = rootProject.file("keystore/evolia-release.p12")
-    val ksPass = System.getenv("KEYSTORE_PASSWORD")
-    if (fixedKs.exists() && !ksPass.isNullOrBlank()) {
-        storeFile = fixedKs
-        storeType = "PKCS12"
-        storePassword = ksPass
-        keyAlias = "evolia"
-        keyPassword = ksPass
-    } else {
-        storeFile = rootProject.file("keystore/evolia-release.p12")
-        storeType = "PKCS12"
-        storePassword = "android"
-        keyAlias = "evolia"
-        keyPassword = "android"
-    }
-}
+            val fixedKs = rootProject.file("keystore/evolia-release.p12")
+            if (fixedKs.exists()) {
+                storeFile = fixedKs
+                storeType = "PKCS12"
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
+                keyAlias = "evolia"
+                keyPassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
+            } else {
+                storeFile = rootProject.file(System.getProperty("user.home") + "/.android/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
     }
 
     // 自动修复无效的外部签名注入
