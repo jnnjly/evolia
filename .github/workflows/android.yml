@@ -24,11 +24,11 @@ jobs:
         cache: gradle
     - name: Restore fixed keystore
       env:
-        KEYSTORE_P12_BASE64: ${{ secrets.KEYSTORE_P12_BASE64 }}
+        KEYSTORE_JKS_BASE64: ${{ secrets.KEYSTORE_JKS_BASE64 }}
       run: |
         mkdir -p keystore
-        echo "$KEYSTORE_P12_BASE64" | base64 -d > keystore/evolia-release.p12
-        echo "keystore bytes: $(wc -c < keystore/evolia-release.p12)"
+        echo "$KEYSTORE_JKS_BASE64" | base64 -d > keystore/evolia-release.jks
+        echo "keystore bytes: $(wc -c < keystore/evolia-release.jks)"
 
     - name: Build with Gradle
       env:

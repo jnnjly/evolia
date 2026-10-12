@@ -106,10 +106,10 @@ android {
             }
         }
          getByName("debug") {
-            val fixedKs = rootProject.file("keystore/evolia-release.p12")
+            val fixedKs = rootProject.file("keystore/evolia-release.jks")
             if (fixedKs.exists()) {
                 storeFile = fixedKs
-                storeType = "PKCS12"
+                storeType = "JKS"
                 storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
                 keyAlias = "evolia"
                 keyPassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
