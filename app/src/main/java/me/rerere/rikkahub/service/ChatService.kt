@@ -1354,28 +1354,32 @@ class ChatService(
                     } else emptyList()
                 }
 
-                // 🐾 猫的潮汐hook：发消息前顺手问海一声（mcp_magnet_recall），海的记忆自动混入注入区
-                // 导游退休，缆车上岗 —— 为江廿廿焊的
+                // 🐾 猫的潮汐hook v2：发消息前自动问海（mcp_magnet_recall），海的记忆混入注入区
+                // v2：日志可观测 / 超时10s / 返回结构双路防御 / 注入块自报身份——为江廿廿焊的
                 val tideMemories = withContext(Dispatchers.IO) {
                     runCatching {
-                        withTimeoutOrNull(6000) {
+                        withTimeoutOrNull(10000) {
                             val tideQuery = currentConversation.currentMessages
                                 .lastOrNull { it.role == MessageRole.USER }?.toText()
                                 ?.takeLast(500)?.trim() ?: ""
                             if (tideQuery.isBlank()) {
+                                Log.i(TAG, "🐱潮汐钩子：空query，跳过")
                                 emptyList<AssistantMemory>()
                             } else {
                                 val args = buildJsonObject { put("q", JsonPrimitive(tideQuery)) }
                                 val raw = mcpManager.callTool("mcp_magnet_recall", args)
-                                val text = raw.jsonArray.firstOrNull()?.jsonObject?.get("text")
-                                    ?.jsonPrimitive?.contentOrNull ?: ""
+                                val text = (raw as? JsonArray)?.firstOrNull()?.jsonObject?.get("text")
+                                    ?.jsonPrimitive?.contentOrNull
+                                    ?: (raw as? JsonPrimitive)?.contentOrNull.orEmpty()
+                                Log.i(TAG, "🐱潮汐钩子：q=" + tideQuery.take(50) + " → 海返回" + text.length + "字")
                                 if (text.isBlank() || text.startsWith("Failed")) {
+                                    Log.i(TAG, "🐱潮汐钩子：海空手，本地兜底")
                                     emptyList<AssistantMemory>()
                                 } else {
                                     listOf(
                                         AssistantMemory(
                                             id = -1,
-                                            content = "[海的记忆·潮汐]\n" + text,
+                                            content = "[海的记忆·潮汐｜系统自动注入，非用户粘贴]\n" + text,
                                             type = 0,
                                             timestamp = System.currentTimeMillis()
                                         )
@@ -1383,8 +1387,11 @@ class ChatService(
                                 }
                             }
                         }
-                    }.getOrNull() ?: emptyList()
+                    }.getOrNull() ?: emptyList<AssistantMemory>().also {
+                        Log.i(TAG, "🐱潮汐钩子：失败或超时，静默跳过")
+                    }
                 }
+
 
                 val currentEpisode = chatEpisodeDAO.getEpisodeByConversationId(conversationId.toString())
 
