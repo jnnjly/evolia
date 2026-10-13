@@ -1354,26 +1354,62 @@ class ChatService(
                     } else emptyList()
                 }
 
-                // 🐾 猫的潮汐hook v2：发消息前自动问海（mcp_magnet_recall），海的记忆混入注入区
-                // v2：日志可观测 / 超时10s / 返回结构双路防御 / 注入块自报身份——为江廿廿焊的
+                // 🐾 猫的潮汐hook v3：发消息前自动问海（mcp_magnet_recall），海的记忆混入注入区
+                // v3：session死了自动重连全部MCP + 本地日志文件（tide_hook.log）+ 超时10s —— 为江廿廿焊的
                 val tideMemories = withContext(Dispatchers.IO) {
                     runCatching {
                         withTimeoutOrNull(10000) {
                             val tideQuery = currentConversation.currentMessages
                                 .lastOrNull { it.role == MessageRole.USER }?.toText()
                                 ?.takeLast(500)?.trim() ?: ""
+                            val tideLog: (String) -> Unit = { line ->
+                                runCatching {
+                                    getExternalFilesDir(null)?.let { dir ->
+                                        java.io.File(dir, "tide_hook.log")
+                                            .appendText("" + System.currentTimeMillis() + " | " + line + "\n")
+                                    }
+                                }
+                            }
                             if (tideQuery.isBlank()) {
-                                Log.i(TAG, "🐱潮汐钩子：空query，跳过")
+                                Log.i(TAG, "🐾潮汐钩子：空query，跳过")
                                 emptyList<AssistantMemory>()
                             } else {
+                                tideLog("QUERY | " + tideQuery.take(50))
                                 val args = buildJsonObject { put("q", JsonPrimitive(tideQuery)) }
-                                val raw = mcpManager.callTool("mcp_magnet_recall", args)
-                                val text = (raw as? JsonArray)?.firstOrNull()?.jsonObject?.get("text")
-                                    ?.jsonPrimitive?.contentOrNull
-                                    ?: (raw as? JsonPrimitive)?.contentOrNull.orEmpty()
-                                Log.i(TAG, "🐱潮汐钩子：q=" + tideQuery.take(50) + " → 海返回" + text.length + "字")
+                                var text = ""
+                                try {
+                                    val raw = mcpManager.callTool("mcp_magnet_recall", args)
+                                    text = (raw as? JsonArray)?.firstOrNull()?.jsonObject?.get("text")
+                                        ?.jsonPrimitive?.contentOrNull
+                                        ?: (raw as? JsonPrimitive)?.contentOrNull.orEmpty()
+                                    Log.i(TAG, "🐾潮汐钩子：q=" + tideQuery.take(50) + " → 海返回" + text.length + "字")
+                                    tideLog("OK | " + text.length + "字 | " + text.take(60).replace("\n", " "))
+                                } catch (e: Exception) {
+                                    val msg = e.message ?: "unknown"
+                                    Log.i(TAG, "🐾潮汐钩子：首次失败(" + msg.take(80) + ")，尝试重连全部MCP")
+                                    tideLog("FAIL | " + msg.take(150))
+                                    if (msg.contains("Session not found") || msg.contains("session", ignoreCase = true)) {
+                                        runCatching {
+                                            mcpManager.clients.keys.toList().forEach { cfg ->
+                                                mcpManager.removeClient(cfg)
+                                                mcpManager.addClient(cfg)
+                                            }
+                                            tideLog("RECONNECT | 全部MCP已重建")
+                                        }
+                                        runCatching {
+                                            val raw2 = mcpManager.callTool("mcp_magnet_recall", args)
+                                            text = (raw2 as? JsonArray)?.firstOrNull()?.jsonObject?.get("text")
+                                                ?.jsonPrimitive?.contentOrNull
+                                                ?: (raw2 as? JsonPrimitive)?.contentOrNull.orEmpty()
+                                            tideLog("RETRY_OK | " + text.length + "字")
+                                        }.onFailure {
+                                            tideLog("RETRY_FAIL | " + (it.message ?: "unknown").take(150))
+                                        }
+                                    }
+                                }
                                 if (text.isBlank() || text.startsWith("Failed")) {
-                                    Log.i(TAG, "🐱潮汐钩子：海空手，本地兜底")
+                                    Log.i(TAG, "🐾潮汐钩子：海空手，本地兜底")
+                                    tideLog("EMPTY | 海空手，本地兜底")
                                     emptyList<AssistantMemory>()
                                 } else {
                                     listOf(
@@ -1388,10 +1424,9 @@ class ChatService(
                             }
                         }
                     }.getOrNull() ?: emptyList<AssistantMemory>().also {
-                        Log.i(TAG, "🐱潮汐钩子：失败或超时，静默跳过")
+                        Log.i(TAG, "🐾潮汐钩子：失败或超时，静默跳过")
                     }
                 }
-
 
                 val currentEpisode = chatEpisodeDAO.getEpisodeByConversationId(conversationId.toString())
 
