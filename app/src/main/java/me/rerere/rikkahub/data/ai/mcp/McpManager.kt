@@ -236,6 +236,14 @@ class McpManager(
         }
     }
 
+    // 🐾 猫的v3补充：session过期时的全员重连——逐个关闭重建，为江廿廿焊的
+    suspend fun reconnectAll() = withContext(Dispatchers.IO) {
+        val configs = clients.keys.toList()
+        configs.forEach { cfg ->
+            runCatching { addClient(cfg) }.onFailure { it.printStackTrace() }
+        }
+    }
+
     suspend fun removeClient(config: McpServerConfig) = withContext(Dispatchers.IO) {
         val toRemove = clients.entries.filter { it.key.id == config.id }
         toRemove.forEach { entry ->
