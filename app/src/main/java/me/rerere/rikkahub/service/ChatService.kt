@@ -1364,7 +1364,7 @@ class ChatService(
                                 ?.takeLast(500)?.trim() ?: ""
                             val tideLog: (String) -> Unit = { line ->
                                 runCatching {
-                                    getExternalFilesDir(null)?.let { dir ->
+                                    context.getExternalFilesDir(null)?.let { dir ->
                                         java.io.File(dir, "tide_hook.log")
                                             .appendText("" + System.currentTimeMillis() + " | " + line + "\n")
                                     }
