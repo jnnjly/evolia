@@ -65,6 +65,7 @@ import me.rerere.rikkahub.core.data.db.entity.ChatMessageEntity
 import kotlinx.coroutines.job
 import me.rerere.rikkahub.core.data.db.entity.ChatSegmentEntity
 import me.rerere.rikkahub.core.data.model.Assistant
+import me.rerere.rikkahub.core.data.model.AssistantMemory
 import me.rerere.rikkahub.core.data.model.AssistantSearchMode
 import me.rerere.rikkahub.core.data.model.Conversation
 import me.rerere.rikkahub.core.data.model.ConversationMessageDeletion
@@ -113,6 +114,8 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 import kotlin.uuid.Uuid
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.contentOrNull
 import me.rerere.rikkahub.core.data.utils.KeywordExtractor
 import me.rerere.rikkahub.core.data.utils.VectorUtils
@@ -1351,6 +1354,38 @@ class ChatService(
                     } else emptyList()
                 }
 
+                // 🐾 猫的潮汐hook：发消息前顺手问海一声（mcp_magnet_recall），海的记忆自动混入注入区
+                // 导游退休，缆车上岗 —— 为江廿廿焊的
+                val tideMemories = withContext(Dispatchers.IO) {
+                    runCatching {
+                        withTimeoutOrNull(6000) {
+                            val tideQuery = currentConversation.currentMessages
+                                .lastOrNull { it.role == MessageRole.USER }?.toText()
+                                ?.takeLast(500)?.trim() ?: ""
+                            if (tideQuery.isBlank()) {
+                                emptyList<AssistantMemory>()
+                            } else {
+                                val args = buildJsonObject { put("q", JsonPrimitive(tideQuery)) }
+                                val raw = mcpManager.callTool("mcp_magnet_recall", args)
+                                val text = raw.jsonArray.firstOrNull()?.jsonObject?.get("text")
+                                    ?.jsonPrimitive?.contentOrNull ?: ""
+                                if (text.isBlank() || text.startsWith("Failed")) {
+                                    emptyList<AssistantMemory>()
+                                } else {
+                                    listOf(
+                                        AssistantMemory(
+                                            id = -1,
+                                            content = "[海的记忆·潮汐]\n" + text,
+                                            type = 0,
+                                            timestamp = System.currentTimeMillis()
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }.getOrNull() ?: emptyList()
+                }
+
                 val currentEpisode = chatEpisodeDAO.getEpisodeByConversationId(conversationId.toString())
 
                 val baseMessages = selectMessagesForGeneration(
@@ -1408,7 +1443,7 @@ class ChatService(
                         model = model,
                         messages = finalContextMessages,
                         assistant = assistant,
-                        memories = retrievedMemories,
+                        memories = retrievedMemories + tideMemories,
                         inputTransformers = buildList { addAll(inputTransformers); add(templateTransformer) },
                         outputTransformers = outputTransformers,
                         isCallMode = callModeConversations.contains(conversationId),
