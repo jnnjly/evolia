@@ -1390,10 +1390,7 @@ class ChatService(
                                     tideLog("FAIL | " + msg.take(150))
                                     if (msg.contains("Session not found") || msg.contains("session", ignoreCase = true)) {
                                         runCatching {
-                                            mcpManager.clients.keys.toList().forEach { cfg ->
-                                                mcpManager.removeClient(cfg)
-                                                mcpManager.addClient(cfg)
-                                            }
+                                            mcpManager.reconnectAll()
                                             tideLog("RECONNECT | 全部MCP已重建")
                                         }
                                         runCatching {
