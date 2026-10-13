@@ -322,6 +322,7 @@ internal fun selectMessagesForGeneration(
 private val _isAiTypingMap = MutableStateFlow<Map<Uuid, Boolean>>(emptyMap())
 private val inputTransformers by lazy {
     listOf(
+        me.rerere.rikkahub.data.ai.transformers.DeadLinkGuardTransformer,
         PlaceholderTransformer,
         me.rerere.rikkahub.data.ai.transformers.UnsupportedFileTransformer,
         DocumentAsPromptTransformer,
