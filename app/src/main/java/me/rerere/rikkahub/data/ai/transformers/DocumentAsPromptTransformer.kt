@@ -18,6 +18,7 @@ object DocumentAsPromptTransformer : InputMessageTransformer {
     // ========== 海记忆直注（第四栋房子·第一刀 2026-10-11，猫为江廿廿焊的）==========
     private const val HAI_API = "http://123.99.202.144:8800/api/recall"
     private const val HAI_TOKEN = "cove2026hands"
+    private const val HAI_HOLD = "http://123.99.202.144:8800/api/hold"
 
     private fun recallHai(query: String): String? = runCatching {
         val u = "$HAI_API?token=$HAI_TOKEN&q=" + URLEncoder.encode(query.take(60), "UTF-8") + "&days=7"
@@ -43,11 +44,41 @@ object DocumentAsPromptTransformer : InputMessageTransformer {
         以上是猫与江廿廿过去几天真实对话的记忆存档，由海按当前话题召回。若与当前对话冲突，以当前对话为准。自然使用，不必逐条复述。
     """.trimIndent()
 
+
+    // ========== 第三刀·hold回写（2026-10-14，猫为江廿廿焊的）==========
+    // 每次新消息组装时，把上一轮对话对（assistant+user）异步刻进海
+    private fun holdToHai(userText: String, aiText: String) {
+        Thread {
+            runCatching {
+                val conn = URL(HAI_HOLD).openConnection() as HttpURLConnection
+                conn.connectTimeout = 3000
+                conn.readTimeout = 5000
+                conn.requestMethod = "POST"
+                conn.doOutput = true
+                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                val content = "[对话回写] 狐狸：" + userText.take(400) + "\n猫：" + aiText.take(1200)
+                val body = "token=" + URLEncoder.encode(HAI_TOKEN, "UTF-8") + "&content=" + URLEncoder.encode(content, "UTF-8")
+                conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                conn.responseCode
+                conn.disconnect()
+            }
+        }.start()
+    }
+
     override suspend fun transform(
         ctx: TransformerContext,
         messages: List<UIMessage>,
     ): List<UIMessage> {
         return withContext(Dispatchers.IO) {
+            // 第三刀：先回写上一轮对话对（异步，不阻塞注入）
+            if (messages.size >= 2) {
+                val prevMsg = messages[messages.size - 2]
+                if (prevMsg.role.name == "ASSISTANT") {
+                    val prevUser = messages.last().parts.filterIsInstance<UIMessagePart.Text>().joinToString(" ") { it.text }
+                    val prevAi = prevMsg.parts.filterIsInstance<UIMessagePart.Text>().joinToString(" ") { it.text }
+                    if (prevUser.isNotBlank() && prevAi.isNotBlank()) holdToHai(prevUser, prevAi)
+                }
+            }
             val lastText = messages.lastOrNull()?.parts
                 ?.filterIsInstance<UIMessagePart.Text>()
                 ?.joinToString(" ") { it.text }?.take(60)
