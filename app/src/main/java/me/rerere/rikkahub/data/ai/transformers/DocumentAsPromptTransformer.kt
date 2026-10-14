@@ -70,18 +70,23 @@ object DocumentAsPromptTransformer : InputMessageTransformer {
         messages: List<UIMessage>,
     ): List<UIMessage> {
         return withContext(Dispatchers.IO) {
-            // 第三刀：先回写上一轮对话对（异步，不阻塞注入）
-            if (messages.size >= 2) {
+            // 第三刀v2：回写上一轮完整对话对（user_A + ai_A），梗概剥离（substringAfter"用户问题"）
+            if (messages.size >= 3) {
                 val prevMsg = messages[messages.size - 2]
+                val prevUserMsg = messages[messages.size - 3]
                 if (prevMsg.role.name == "ASSISTANT") {
-                    val prevUser = messages.last().parts.filterIsInstance<UIMessagePart.Text>().joinToString(" ") { it.text }
-                    val prevAi = prevMsg.parts.filterIsInstance<UIMessagePart.Text>().joinToString(" ") { it.text }
+                    val rawPrev = prevUserMsg.parts.filterIsInstance<UIMessagePart.Text>().joinToString(" ") { it.text }
+                    val prevUser = rawPrev.substringAfter("用户问题", rawPrev).trim().take(400)
+                    val prevAi = prevMsg.parts.filterIsInstance<UIMessagePart.Text>().joinToString(" ") { it.text }.take(1200)
                     if (prevUser.isNotBlank() && prevAi.isNotBlank()) holdToHai(prevUser, prevAi)
                 }
             }
-            val lastText = messages.lastOrNull()?.parts
+            val rawLast = messages.lastOrNull()?.parts
                 ?.filterIsInstance<UIMessagePart.Text>()
-                ?.joinToString(" ") { it.text }?.take(60)
+                ?.joinToString(" ") { it.text }
+            // v2修复：evolia把系统梗概（"# 系统消息..."）塞进user消息头部，真实消息在"用户问题"标记之后
+            val cleanUser = rawLast?.substringAfter("用户问题", rawLast)?.trim()
+            val lastText = cleanUser?.take(60)
             val haiMemory = lastText?.let { recallHai(it) }
             messages.mapIndexed { idx, message ->
                 if (haiMemory != null && idx == messages.lastIndex) {
