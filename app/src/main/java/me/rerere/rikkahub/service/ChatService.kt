@@ -1478,6 +1478,11 @@ class ChatService(
                     messages
                 } else messagesForModel
 
+        // [幻影案修复 2026-10-15] 发送前快照上下文消息ID集合：回复切分改用ID差而非位置差。
+        // 根因：maxHistoryMessages 的 limitContext 截短/工具循环重组会使生成侧返回列表与发送侧长度不一致，
+        // drop(finalContextMessages.size) 按位置切分时会把上下文尾部旧消息误判为新消息复制入库（幻影案七发）。
+        val sentMessageIds = finalContextMessages.map { it.id }.toSet()
+
                 generationHandler.generateText(
                         settings = settings,
                         model = model,
@@ -1618,9 +1623,10 @@ class ChatService(
                         if (chunk is GenerationChunk.Messages) {
                             var conversationSnapshot = currentConversation
                             val finalMessages = chunk.messages
-                            val newMessages = finalMessages.drop(finalContextMessages.size).mapIndexed { index, msg ->
-                                msg.copy(id = processMessageIds.getOrPut(index) { msg.id })
-                            }
+                    // [幻影案修复 2026-10-15] ID集合差切分：只要不在发送快照里的，就是本轮新消息，天然免疫两侧列表错位。
+                    val newMessages = finalMessages.filter { msg -> msg.id !in sentMessageIds }.mapIndexed { index, msg ->
+                        msg.copy(id = processMessageIds.getOrPut(index) { msg.id })
+                    }
                             if (newMessages.isEmpty()) {
                                 // 流结束后 GenerationHandler 会再 emit 一次以附加 usedMemories 等上下文来源
                                 // 此时无新消息但 lastAI 已更新，需同步到快照，否则上下文来源会丢失
