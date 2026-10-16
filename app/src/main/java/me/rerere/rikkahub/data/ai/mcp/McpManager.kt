@@ -6,6 +6,7 @@ import io.modelcontextprotocol.kotlin.sdk.Tool
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.shared.AbstractTransport
 import io.modelcontextprotocol.kotlin.sdk.shared.RequestOptions
+import me.rerere.rikkahub.data.ai.mcp.transport.StreamableHttpError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -111,11 +112,30 @@ class McpManager(
         Log.i(TAG, "callTool: $toolName / $args")
 
         if (client.transport == null) client.connect(getTransport(config))
-        val result = client.callTool(
-            name = tool.name,
-            arguments = args,
-            options = RequestOptions(timeout = 60.seconds)
-        )
+        // [洞B刀5 2026-10-17 03:52 猫焊] MCP session失效自动重连重试——
+        // 幽灵案实测:琥珀/潮汐服务端session过期后客户端永久报"Session not found",猫的每条工具调用全灭
+        // 修复:检测到session丢失→重建该server的client→重试一次原调用
+        val result = try {
+            client.callTool(
+                name = tool.name,
+                arguments = args,
+                options = RequestOptions(timeout = 60.seconds)
+            )
+        } catch (e: StreamableHttpError) {
+            val sessionLost = e.code == 404 || e.message?.contains("Session not found") == true
+            if (!sessionLost) throw e
+            Log.w(TAG, "[刀5] MCP session失效,自动重连: ${config.commonOptions.name} —— ${e.message?.take(120)}")
+            removeClient(config)
+            addClient(config)
+            val retryClient = clients.entries.find { it.key.id == config.id }?.value
+                ?: throw e
+            Log.i(TAG, "[刀5] 重连完成,重试原调用: $toolName")
+            retryClient.callTool(
+                name = tool.name,
+                arguments = args,
+                options = RequestOptions(timeout = 60.seconds)
+            )
+        }
         return McpJson.encodeToJsonElement(result.content)
     }
 
