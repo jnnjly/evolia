@@ -376,7 +376,7 @@ class ChatService(
 
     // [洞B刀3 2026-10-17 03:33 猫焊] 监控触发冷却表：同会话60秒内重复MONITOR_TRIGGER静默丢弃——
     // 幽灵案实测:触发风暴(开App/定位轮询)每3秒强cancel旧生成再launch新生成,复读刷屏的放大器
-    private val monitorTriggerCooldown = java.util.concurrent.ConcurrentHashMap<Uuid, Long>()
+    private val monitorTriggerCooldown = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private companion object { const val MONITOR_COOLDOWN_MS = 60_000L }
     private val _isForeground = MutableStateFlow(false)
     val isForeground: StateFlow<Boolean> = _isForeground.asStateFlow()
@@ -526,18 +526,19 @@ class ChatService(
     }
 
     suspend fun executeAgentTask(task: me.rerere.rikkahub.core.data.db.entity.AgentTaskEntity) {
-        // [洞B刀3 2026-10-17 03:33 猫焊] MONITOR_TRIGGER同会话60秒冷却:重复触发静默丢弃,不打扰不生成
+        val data = JsonInstant.parseToJsonElement(task.taskData) as? JsonObject ?: return
+        // [洞B刀3 v2 2026-10-17 猫焊] MONITOR_TRIGGER冷却键改用monitor_name——
+        // CI#35实锤: AgentTaskEntity无conversationId字段(531:57 Unresolved reference),改以监控名为键,同监控60秒只醒一次
         if (task.taskType == "MONITOR_TRIGGER") {
-            val convKey = runCatching { Uuid.parse(task.conversationId) }.getOrNull()
+            val coolKey = data["monitor_name"]?.jsonPrimitive?.contentOrNull ?: task.taskType
             val now = System.currentTimeMillis()
-            val last = convKey?.let { monitorTriggerCooldown[it] } ?: 0L
+            val last = monitorTriggerCooldown[coolKey] ?: 0L
             if (now - last < MONITOR_COOLDOWN_MS) {
-                Log.i("ChatService", "[洞B刀3] 监控触发冷却中,静默丢弃: conv=$convKey 距上次${now-last}ms")
+                Log.i("ChatService", "[洞B刀3] 监控触发冷却中,静默丢弃: key=$coolKey 距上次${now-last}ms")
                 return
             }
-            convKey?.let { monitorTriggerCooldown[it] = now }
+            monitorTriggerCooldown[coolKey] = now
         }
-        val data = JsonInstant.parseToJsonElement(task.taskData) as? JsonObject ?: return
 
         val instruction = data["instruction"]?.jsonPrimitive?.contentOrNull ?: ""
         val settings = settingsStore.settingsFlow.first()
