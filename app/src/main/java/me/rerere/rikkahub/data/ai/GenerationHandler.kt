@@ -988,8 +988,9 @@ class GenerationHandler(
             // - DIARY_COMMENT / NORMAL: 历史消息截断到前 100 字，保留最后一条 user 消息完整
             val lastUserMsgIndex = messages.indexOfLast { it.role == CoreMessageRole.USER }
             messages.mapIndexed { index, msg ->
+                // [洞B刀2 2026-10-17 03:32 猫焊] AGENT_TASK来源同样截断到100字——
+                // 幽灵案实测:监控触发消息全量堆积把上下文撑爆(token帮凶),改为与其他skipContext同策略
                 val shouldTruncate = msg.skipContext
-                    && msg.messageSource != MessageSource.AGENT_TASK
                     && index != lastUserMsgIndex
                 if (shouldTruncate) {
                     msg.copy(parts = msg.parts.map { part ->

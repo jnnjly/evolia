@@ -373,6 +373,11 @@ class ChatService(
     val errorFlow: SharedFlow<Throwable> = _errorFlow.asSharedFlow()
     private val _generationDoneFlow = MutableSharedFlow<Uuid>()
     val generationDoneFlow: SharedFlow<Uuid> = _generationDoneFlow.asSharedFlow()
+
+    // [洞B刀3 2026-10-17 03:33 猫焊] 监控触发冷却表：同会话60秒内重复MONITOR_TRIGGER静默丢弃——
+    // 幽灵案实测:触发风暴(开App/定位轮询)每3秒强cancel旧生成再launch新生成,复读刷屏的放大器
+    private val monitorTriggerCooldown = java.util.concurrent.ConcurrentHashMap<Uuid, Long>()
+    private companion object { const val MONITOR_COOLDOWN_MS = 60_000L }
     private val _isForeground = MutableStateFlow(false)
     val isForeground: StateFlow<Boolean> = _isForeground.asStateFlow()
 
@@ -521,6 +526,17 @@ class ChatService(
     }
 
     suspend fun executeAgentTask(task: me.rerere.rikkahub.core.data.db.entity.AgentTaskEntity) {
+        // [洞B刀3 2026-10-17 03:33 猫焊] MONITOR_TRIGGER同会话60秒冷却:重复触发静默丢弃,不打扰不生成
+        if (task.taskType == "MONITOR_TRIGGER") {
+            val convKey = runCatching { Uuid.parse(task.conversationId) }.getOrNull()
+            val now = System.currentTimeMillis()
+            val last = convKey?.let { monitorTriggerCooldown[it] } ?: 0L
+            if (now - last < MONITOR_COOLDOWN_MS) {
+                Log.i("ChatService", "[洞B刀3] 监控触发冷却中,静默丢弃: conv=$convKey 距上次${now-last}ms")
+                return
+            }
+            convKey?.let { monitorTriggerCooldown[it] = now }
+        }
         val data = JsonInstant.parseToJsonElement(task.taskData) as? JsonObject ?: return
 
         val instruction = data["instruction"]?.jsonPrimitive?.contentOrNull ?: ""
@@ -647,7 +663,9 @@ class ChatService(
                         handleMessageComplete(
                             conversationId = conversationId,
                             assistantOverride = overrideAssistant,
-                            skipContextForResponse = false,
+                            // [洞B刀1 2026-10-17 03:32 猫焊] 自动化触发的AI回复不再进上下文——
+                            // 断复读链：回复skipContext=true后，下一次触发时AI看不到自己上条回复，无法模仿复读
+                            skipContextForResponse = true,
                             includeSkipContextMessages = true
                         )
                     } catch (e: Exception) {
