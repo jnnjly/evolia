@@ -112,12 +112,13 @@ class SpontaneousWorker(
 
         // RAG Retrieval
         val lastUserMessage = conversation.currentMessages.lastOrNull { it.role == MessageRole.USER }?.toText() ?: "User status"
-        val memories = memoryRepository.retrieveRelevantMemoriesWithScores(
+        // [patch-dongC] memory gate: respect assistant.enableMemory in background workers
+        val memories = if (assistant.enableMemory) memoryRepository.retrieveRelevantMemoriesWithScores(
             assistantId = assistant.id.toString(),
             query = lastUserMessage,
             limit = assistant.ragLimit,
             mode = assistant.memoryRetrievalMode
-        ).map { it.first }
+        ).map { it.first } else emptyList()
         val memoryContext = memories.joinToString("\n") { "- ${it.content}" }
         val history = conversation.currentMessages.takeLast(6).joinToString("\n") { "${it.role}: ${it.toText()}" }
 

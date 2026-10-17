@@ -52,8 +52,8 @@ class ScheduledMessageWorker(
 
             // RAG Retrieval
             val lastUserMessage = conversation.currentMessages.lastOrNull { it.role == MessageRole.USER }?.toText() ?: ""
-            val memories = if (lastUserMessage.isNotBlank()) {
-                // 修改点：调用新方法，传入检索模式并映射结果
+            // [patch-dongC] memory gate: respect assistant.enableMemory in background workers
+            val memories = if (assistant.enableMemory && lastUserMessage.isNotBlank()) {
                 memoryRepository.retrieveRelevantMemoriesWithScores(
                     assistantId = assistant.id.toString(),
                     query = lastUserMessage,

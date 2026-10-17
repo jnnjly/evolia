@@ -41,7 +41,7 @@ import me.rerere.rikkahub.core.data.model.MessageNode
         ProfileHistoryEntity::class,
         AppLockEntity::class
     ],
-    version = 35,
+    version = 36,
     exportSchema = true
 )
 @TypeConverters(
@@ -317,6 +317,24 @@ abstract class AppDatabase : RoomDatabase() {
          * 系统消息（不显示给用户但实际发送给 AI），让 AI 知道用户触发了锁定。
          * 旧记录无此字段时默认空字符串，仅显示遮罩不发消息。
          */
+
+        /**
+         * [patch-dongC] 35->36: 清空 evolia 本地记忆库（该删的就删·她2026-10-17拍板）。
+         * 四库正本在 VPS（潮汐原文+琥珀碑+Serein图书馆），app 本地记忆为冗余副本且含幽灵案污染数据。
+         * 清空对象：MemoryEntity（自动固化记忆）、ChatEpisodeEntity（会话段落归档）、
+         * chat_segments（分段缓存）、embedding_cache（嵌入缓存）。
+         * 聊天记录、日记、配置、VPS 四库均不动。WebDAV 灾备先于本 migration（用户已开同步）。
+         */
+        val MIGRATION_35_36 = object : Migration(35, 36) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                Log.v(TAG, "开始 35->36 迁移：清空本地记忆库（dongC）")
+                db.execSQL("DELETE FROM MemoryEntity")
+                db.execSQL("DELETE FROM ChatEpisodeEntity")
+                db.execSQL("DELETE FROM chat_segments")
+                db.execSQL("DELETE FROM embedding_cache")
+            }
+        }
+
         val MIGRATION_34_35 = object : Migration(34, 35) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 Log.v(TAG, "开始 34->35 迁移：app_locks 表新增 assistant_id 列")

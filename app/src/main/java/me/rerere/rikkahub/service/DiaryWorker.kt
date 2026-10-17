@@ -205,7 +205,8 @@ class DiaryWorker(
                 ?: error("没有可用模型")
 
             if (newMessages.isEmpty()) {
-                val memories = memoryRepo.getCombinedMemoriesFlow(assistant.id.toString()).first()
+                // [patch-dongC] memory gate: respect assistant.enableMemory in diary worker
+                val memories = if (assistant.enableMemory) memoryRepo.getCombinedMemoriesFlow(assistant.id.toString()).first() else emptyList()
                 val selectedMemories = if (memories.isNotEmpty()) {
                     memories.shuffled().take(3).joinToString("\n") { "- ${it.content}" }
                 } else "No significant memories found yet."
