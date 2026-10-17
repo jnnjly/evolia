@@ -1445,6 +1445,44 @@ class ChatService(
                     }
                 }
 
+                // 🐾 dongE Serein钩子：发消息前问图书馆（MCP recall_memory），碑文与原文混入注入区 —— 为江廿廿焊的
+                val sereinMemories = withContext(Dispatchers.IO) {
+                    runCatching {
+                        withTimeoutOrNull(10000) {
+                            val sereinQuery = currentConversation.currentMessages
+                                .lastOrNull { it.role == MessageRole.USER }?.toText()
+                                ?.takeLast(500)?.trim() ?: ""
+                            if (sereinQuery.isBlank()) {
+                                emptyList<AssistantMemory>()
+                            } else {
+                                val args = buildJsonObject {
+                                    put("query", JsonPrimitive(sereinQuery))
+                                    put("limit", JsonPrimitive(2))
+                                    put("mode", JsonPrimitive("surface"))
+                                    put("method", JsonPrimitive("semantic"))
+                                    put("min_cosine", JsonPrimitive(0.35))
+                                    put("intent", JsonPrimitive("direct"))
+                                }
+                                val text = runCatching {
+                                    val raw = mcpManager.callTool("recall_memory", args)
+                                    (raw as? JsonArray)?.firstOrNull()?.jsonObject?.get("text")
+                                        ?.jsonPrimitive?.contentOrNull
+                                        ?: (raw as? JsonPrimitive)?.contentOrNull.orEmpty()
+                                }.getOrDefault("")
+                                if (text.isBlank()) {
+                                    Log.i(TAG, "🐾Serein钩子：无相关记忆，跳过")
+                                    emptyList<AssistantMemory>()
+                                } else {
+                                    Log.i(TAG, "🐾Serein钩子：q=" + sereinQuery.take(50) + " → 图书馆返回" + text.length + "字")
+                                    listOf(AssistantMemory(id = -2, content = "[Serein图书馆·自动递书]\n" + text))
+                                }
+                            }
+                        }
+                    }.getOrNull() ?: emptyList<AssistantMemory>().also {
+                        Log.i(TAG, "🐾Serein钩子：失败或超时，静默跳过")
+                    }
+                }
+
                 val currentEpisode = chatEpisodeDAO.getEpisodeByConversationId(conversationId.toString())
 
                 val baseMessages = selectMessagesForGeneration(
@@ -1507,7 +1545,7 @@ class ChatService(
                         model = model,
                         messages = finalContextMessages,
                         assistant = assistant,
-                        memories = retrievedMemories + tideMemories,
+                        memories = retrievedMemories + tideMemories + sereinMemories,
                         inputTransformers = buildList { addAll(inputTransformers); add(templateTransformer) },
                         outputTransformers = outputTransformers,
                         isCallMode = callModeConversations.contains(conversationId),
