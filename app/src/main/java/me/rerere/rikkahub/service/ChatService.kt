@@ -1445,15 +1445,15 @@ class ChatService(
                     }
                 }
 
-                // 🐾 dongE Serein钩子：发消息前问图书馆（MCP recall_memory），碑文与原文混入注入区 —— 为江廿廿焊的
-                val sereinMemories = withContext(Dispatchers.IO) {
+                // 🐾 dongF Serein钩子：发消息前问图书馆（MCP recall_memory），独立文本注入（原生memories管线外）——为江廿廿焊的
+                val sereinContextText = withContext(Dispatchers.IO) {
                     runCatching {
                         withTimeoutOrNull(10000) {
                             val sereinQuery = currentConversation.currentMessages
                                 .lastOrNull { it.role == MessageRole.USER }?.toText()
                                 ?.takeLast(500)?.trim() ?: ""
                             if (sereinQuery.isBlank()) {
-                                emptyList<AssistantMemory>()
+                                ""
                             } else {
                                 val args = buildJsonObject {
                                     put("query", JsonPrimitive(sereinQuery))
@@ -1471,14 +1471,14 @@ class ChatService(
                                 }.getOrDefault("")
                                 if (text.isBlank()) {
                                     Log.i(TAG, "🐾Serein钩子：无相关记忆，跳过")
-                                    emptyList<AssistantMemory>()
+                                    ""
                                 } else {
                                     Log.i(TAG, "🐾Serein钩子：q=" + sereinQuery.take(50) + " → 图书馆返回" + text.length + "字")
-                                    listOf(AssistantMemory(id = -2, content = "[Serein图书馆·自动递书]\n" + text))
+                                    "[Serein图书馆·自动递书]\n" + text + "\n（以上是Serein图书馆按当前话题自动递来的碑文与原文，若与当前对话冲突，以当前对话为准。自然使用，不必逐条复述。）"
                                 }
                             }
                         }
-                    }.getOrNull() ?: emptyList<AssistantMemory>().also {
+                    }.getOrNull() ?: "".also {
                         Log.i(TAG, "🐾Serein钩子：失败或超时，静默跳过")
                     }
                 }
@@ -1535,17 +1535,31 @@ class ChatService(
                     messages
                 } else messagesForModel
 
+        // 🐾 dongF Serein改道：sereinContextText作为最后一条USER消息的前置文本注入（琥珀hai_memory同范式），
+        // 不走原生memories管线（enableMemory闸外、前端零入口）——为江廿廿焊的
+        val finalContextFinal = if (sereinContextText.isNotBlank()) {
+            val list = finalContextMessages.toMutableList()
+            val lastUserIdx = list.indexOfLast { it.role == MessageRole.USER }
+            if (lastUserIdx != -1) {
+                val m = list[lastUserIdx]
+                list[lastUserIdx] = m.copy(parts = listOf(UIMessagePart.Text(sereinContextText + "\n\n")) + m.parts)
+            } else {
+                list.add(UIMessage(role = MessageRole.USER, parts = listOf(UIMessagePart.Text(sereinContextText))))
+            }
+            list
+        } else finalContextMessages
+
         // [幻影案修复 2026-10-15] 发送前快照上下文消息ID集合：回复切分改用ID差而非位置差。
         // 根因：maxHistoryMessages 的 limitContext 截短/工具循环重组会使生成侧返回列表与发送侧长度不一致，
         // drop(finalContextMessages.size) 按位置切分时会把上下文尾部旧消息误判为新消息复制入库（幻影案七发）。
-        val sentMessageIds = finalContextMessages.map { it.id }.toSet()
+        val sentMessageIds = finalContextFinal.map { it.id }.toSet()
 
                 generationHandler.generateText(
                         settings = settings,
                         model = model,
-                        messages = finalContextMessages,
+                        messages = finalContextFinal,
                         assistant = assistant,
-                        memories = retrievedMemories + tideMemories + sereinMemories,
+                        memories = retrievedMemories + tideMemories,
                         inputTransformers = buildList { addAll(inputTransformers); add(templateTransformer) },
                         outputTransformers = outputTransformers,
                         isCallMode = callModeConversations.contains(conversationId),

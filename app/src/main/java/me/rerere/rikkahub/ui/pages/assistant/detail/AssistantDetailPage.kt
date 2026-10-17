@@ -655,12 +655,13 @@ private fun AssistantDetailHome(
         }
 
         SettingsGroup(title = stringResource(R.string.assistant_detail_group_capabilities)) {
-            NavigationCard(
-                icon = Icons.Rounded.Memory,
-                title = stringResource(R.string.assistant_page_tab_memory),
-                description = stringResource(R.string.assistant_detail_memory_desc),
-                onClick = onNavigateToMemory
-            )
+            // 🐾 dongF 2026-10-17：记忆入口前端隐藏——她裁定：evolia原生记忆仅应急兜底，记忆架构全在琥珀/潮汐/Serein外置云端
+            // NavigationCard(
+            //     icon = Icons.Rounded.Memory,
+            //     title = stringResource(R.string.assistant_page_tab_memory),
+            //     description = stringResource(R.string.assistant_detail_memory_desc),
+            //     onClick = onNavigateToMemory
+            // )
 
             NavigationCard(
                 icon = Icons.Rounded.Build,
