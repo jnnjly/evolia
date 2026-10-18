@@ -86,7 +86,7 @@ object DocumentAsPromptTransformer : InputMessageTransformer {
                 ?.joinToString(" ") { it.text }
             // v2修复：evolia把系统梗概（"# 系统消息..."）塞进user消息头部，真实消息在"用户问题"标记之后
             val cleanUser = rawLast?.substringAfter("用户问题", rawLast)?.trim()
-            val lastText = cleanUser?.take(60)
+            val lastText = cleanUser?.takeIf { it.isNotBlank() }?.take(60)
             val haiMemory = lastText?.let { recallHai(it) }
             messages.mapIndexed { idx, message ->
                 if (haiMemory != null && idx == messages.lastIndex) {
