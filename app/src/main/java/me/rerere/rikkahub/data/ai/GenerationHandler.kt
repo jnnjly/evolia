@@ -1801,7 +1801,7 @@ class GenerationHandler(
                     Log.w(TAG, "GEN_LIMIT_HIT: completionTokens=${tu.completionTokens} >= maxTokens=$cap*0.95，输出疑似触顶截断（字又断案A1-b）")
                     currentMessages = currentMessages + UIMessage(
                         role = CoreMessageRole.ASSISTANT,
-                        parts = listOf(UIMessagePart.Text("⚠️ 这条回复达到了输出长度上限，可能被截断了。说"继续"猫会接着写。")),
+                        parts = listOf(UIMessagePart.Text("⚠️ 这条回复达到了输出长度上限，可能被截断了。说「继续」猫会接着写。")),
                         skipContext = true
                     )
                     onUpdateMessages(currentMessages)
