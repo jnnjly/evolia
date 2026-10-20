@@ -65,12 +65,14 @@ data class UIMessage(
             var newParts = delta.parts.fold(parts) { acc, deltaPart ->
                 when (deltaPart) {
                     is UIMessagePart.Text -> {
-                        val existingTextPart =
-                            acc.find { it is UIMessagePart.Text } as? UIMessagePart.Text
-                        if (existingTextPart != null) {
-                            acc.map { part ->
-                                if (part is UIMessagePart.Text) {
-                                    UIMessagePart.Text(existingTextPart.text + deltaPart.text)
+                        // [工程六号·字又断案A4修复 2026-10-20] 修复多Text part覆盖bug：
+                        // 旧逻辑 find 第一个 Text 后，map 中把【所有】Text part 都替换成 first.text+delta，
+                        // 导致其余 Text part 原文被覆盖丢失且内容重复。现改为 indexOfFirst 精确定位，只合并命中段。
+                        val existingIndex = acc.indexOfFirst { it is UIMessagePart.Text }
+                        if (existingIndex >= 0) {
+                            acc.mapIndexed { idx, part ->
+                                if (idx == existingIndex && part is UIMessagePart.Text) {
+                                    UIMessagePart.Text(part.text + deltaPart.text)
                                 } else part
                             }
                         } else {

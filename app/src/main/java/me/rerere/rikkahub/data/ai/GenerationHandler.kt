@@ -615,7 +615,17 @@ class GenerationHandler(
         conversationId: Uuid? = null,
         isCallMode: Boolean = false,
     ): BuildMessagesResult {
-        fun estimateTokens(text: String) = text.length / 4
+        fun estimateTokens(text: String): Int {
+            // [工程六号·字又断案A3修复 2026-10-20] CJK加权：汉字/假名/谚文/全角标点≈1token，其余按4字符≈1token（旧算法 text.length/4 将中文低估约4倍）
+            var cjk = 0
+            var other = 0
+            for (ch in text) {
+                val c = ch.code
+                if (c in 0x2E80..0x9FFF || c in 0x30000..0x3134F || c in 0xAC00..0xD7AF || c in 0xF900..0xFAFF || c in 0x3000..0x303F || c in 0xFF00..0xFFEF) cjk++
+                else other++
+            }
+            return cjk + (other + 3) / 4
+        }
         fun estimateTokens(message: UIMessage) = estimateTokens(message.toText())
 
         val maxTokens = assistant.maxTokenUsage
@@ -1782,6 +1792,14 @@ class GenerationHandler(
                     }
                 }
                 onUpdateMessages(currentMessages)
+            }
+            // [工程六号·字又断案A1修复 2026-10-20] 启发式触顶检测：
+            // completionTokens 达到 maxTokens 的 95% 即判定输出撞墙（旧版全程无人读结束原因，导致静默断字）
+            currentMessages.lastOrNull()?.usage?.let { tu ->
+                val cap = assistant.maxTokens
+                if (cap != null && cap > 0 && tu.completionTokens >= cap * 0.95) {
+                    Log.w(TAG, "GEN_LIMIT_HIT: completionTokens=${tu.completionTokens} >= maxTokens=$cap*0.95，输出疑似触顶截断（字又断案A1-a）")
+                }
             }
             if (hasContextSources) {
                 currentMessages = currentMessages.mapIndexed { index, message ->
