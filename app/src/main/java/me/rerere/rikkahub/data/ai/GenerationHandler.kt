@@ -1793,12 +1793,18 @@ class GenerationHandler(
                 }
                 onUpdateMessages(currentMessages)
             }
-            // [工程六号·字又断案A1修复 2026-10-20] 启发式触顶检测：
-            // completionTokens 达到 maxTokens 的 95% 即判定输出撞墙（旧版全程无人读结束原因，导致静默断字）
+            // [工程六号·字又断案A1-b 2026-10-20] 启发式触顶检测升级版：
+            // completionTokens 达到 maxTokens 的 95% 即判定撞墙 → 日志留痕 + 向消息流追加用户可见徽标消息
             currentMessages.lastOrNull()?.usage?.let { tu ->
                 val cap = assistant.maxTokens
                 if (cap != null && cap > 0 && tu.completionTokens >= cap * 0.95) {
-                    Log.w(TAG, "GEN_LIMIT_HIT: completionTokens=${tu.completionTokens} >= maxTokens=$cap*0.95，输出疑似触顶截断（字又断案A1-a）")
+                    Log.w(TAG, "GEN_LIMIT_HIT: completionTokens=${tu.completionTokens} >= maxTokens=$cap*0.95，输出疑似触顶截断（字又断案A1-b）")
+                    currentMessages = currentMessages + UIMessage(
+                        role = CoreMessageRole.ASSISTANT,
+                        parts = listOf(UIMessagePart.Text("⚠️ 这条回复达到了输出长度上限，可能被截断了。说"继续"猫会接着写。")),
+                        skipContext = true
+                    )
+                    onUpdateMessages(currentMessages)
                 }
             }
             if (hasContextSources) {
