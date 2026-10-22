@@ -256,6 +256,9 @@ internal fun removeVoiceMessageMarkerForDisplay(text: String): String {
  */
 private const val SEGMENT_FAILURE_THRESHOLD = 3
 
+// 2026-10-22 焊：L1 自动固化总开关（廿廿拍板关死）——false 时自动 summarizeAndRefresh 一律不触发
+private const val L1_AUTO_SUMMARY_ENABLED = false
+
 // ------------------------------------------------------------------
 //  安全解码 UIMessage：损坏的消息只记日志 + 抛 null，绝不闪退
 // ------------------------------------------------------------------
@@ -2515,7 +2518,7 @@ class ChatService(
             if (batch.size < 200) break
         }
 
-        if (coreMessageCount >= max) summarizeAndRefresh(id, skipArchive = true, excludeLatestMessage = true)
+        if (L1_AUTO_SUMMARY_ENABLED && coreMessageCount >= max) summarizeAndRefresh(id, skipArchive = true, excludeLatestMessage = true)
     }
     @SuppressLint("SuspiciousIndentation")
     suspend fun summarizeAndRefresh(
