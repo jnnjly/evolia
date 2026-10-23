@@ -1484,28 +1484,28 @@ internal fun FilesPicker(
                 }
 
                 // Lorebooks button
-                CompositionLocalProvider(LocalAbsoluteTonalElevation provides if (amoledMode && isDarkMode) 0.dp else LocalAbsoluteTonalElevation.current) {
-                    Surface(
-                        modifier = Modifier.weight(1f),
-                        shape = middleRightShape,
-                        color = if (amoledMode && isDarkMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        tonalElevation = if (amoledMode && isDarkMode) 0.dp else 6.dp,
-                        onClick = { showLorebooksPicker = true }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Rounded.Book, null, tint = if (activeLorebookCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                            Column {
-                                Text(stringResource(R.string.lorebooks_picker_title), style = MaterialTheme.typography.labelLarge, color = if (activeLorebookCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-                                Text("$activeLorebookCount/${settings.lorebooks.size}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                }
-            }
+    //                 CompositionLocalProvider(LocalAbsoluteTonalElevation provides if (amoledMode && isDarkMode) 0.dp else LocalAbsoluteTonalElevation.current) {
+    //                     Surface(
+    //                         modifier = Modifier.weight(1f),
+    //                         shape = middleRightShape,
+    //                         color = if (amoledMode && isDarkMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh,
+    //                         tonalElevation = if (amoledMode && isDarkMode) 0.dp else 6.dp,
+    //                         onClick = { showLorebooksPicker = true }
+    //                     ) {
+    //                         Row(
+    //                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp),
+    //                             horizontalArrangement = Arrangement.spacedBy(8.dp),
+    //                             verticalAlignment = Alignment.CenterVertically
+    //                         ) {
+    //                             Icon(Icons.Rounded.Book, null, tint = if (activeLorebookCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+    //                             Column {
+    //                                 Text(stringResource(R.string.lorebooks_picker_title), style = MaterialTheme.typography.labelLarge, color = if (activeLorebookCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    //                                 Text("$activeLorebookCount/${settings.lorebooks.size}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    //                             }
+    //                         }
+    //                     }
+    //                 }
+    //             }
 
             // Row 3: ReasoningTokens and UI Mode Switcher
             Row(
@@ -1614,31 +1614,31 @@ internal fun FilesPicker(
             }
 
             // Row 4: Consolidation Button
-            CompositionLocalProvider(LocalAbsoluteTonalElevation provides if (amoledMode && isDarkMode) 0.dp else LocalAbsoluteTonalElevation.current) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = if (showContextRefresh) middleLeftShape else fullBottomShape,
-                    color = if (amoledMode && isDarkMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    tonalElevation = if (amoledMode && isDarkMode) 0.dp else 6.dp,
-                    onClick = {
-                        onConsolidate()
-                        onDismiss()
-                    }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp).fillMaxSize(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Rounded.Summarize, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.assistant_memory_consolidate_now), style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-            }
+    //             CompositionLocalProvider(LocalAbsoluteTonalElevation provides if (amoledMode && isDarkMode) 0.dp else LocalAbsoluteTonalElevation.current) {
+    //                 Surface(
+    //                     modifier = Modifier.fillMaxWidth().height(56.dp),
+    //                     shape = if (showContextRefresh) middleLeftShape else fullBottomShape,
+    //                     color = if (amoledMode && isDarkMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh,
+    //                     tonalElevation = if (amoledMode && isDarkMode) 0.dp else 6.dp,
+    //                     onClick = {
+    //                         onConsolidate()
+    //                         onDismiss()
+    //                     }
+    //                 ) {
+    //                     Row(
+    //                         modifier = Modifier.padding(horizontal = 16.dp).fillMaxSize(),
+    //                         horizontalArrangement = Arrangement.Center,
+    //                         verticalAlignment = Alignment.CenterVertically
+    //                     ) {
+    //                         Icon(Icons.Rounded.Summarize, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+    //                         Spacer(Modifier.width(8.dp))
+    //                         Text(stringResource(R.string.assistant_memory_consolidate_now), style = MaterialTheme.typography.labelLarge)
+    //                     }
+    //                 }
+    //             }
 
-            // Row 5: Context Refresh
-            if (showContextRefresh) {
+            // Row 5: Context Refresh —— 2026-10-23 廿廿圈选移除
+            if (false && showContextRefresh) {
                 CompositionLocalProvider(LocalAbsoluteTonalElevation provides if (amoledMode && isDarkMode) 0.dp else LocalAbsoluteTonalElevation.current) {
                     Surface(
                         modifier = Modifier.fillMaxWidth().height(56.dp),
