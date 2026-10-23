@@ -1505,7 +1505,7 @@ internal fun FilesPicker(
     //                         }
     //                     }
     //                 }
-    //             }
+                }
 
             // Row 3: ReasoningTokens and UI Mode Switcher
             Row(
