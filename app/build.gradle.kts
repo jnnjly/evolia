@@ -39,7 +39,9 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // ndk.abiFilters 已移除:splits.abi 已包含 arm64-v8a,两者并存会撞车(10-24 CI验尸)
+        ndk {
+            abiFilters += listOf("arm64-v8a")  // 廿廿点单:只出arm64,包瘦身;Chaquopy必须要求此配置
+        }
         manifestPlaceholders["extractNativeLibs"] = "true"
         // 默认启用
         resValue("bool", "text_selection_enabled", "true")
@@ -69,14 +71,6 @@ android {
         }
     }
 
-    splits {
-        abi {
-            isEnable = !isBuildingBundle
-            reset()
-            include("arm64-v8a")
-            isUniversalApk = false
-        }
-    }
 
     signingConfigs {
         create("release") {
