@@ -33,14 +33,14 @@ android {
         applicationId = "ailand.lastchat.rikkafork.cocolal"
         minSdk = 28
         targetSdk = 36
-        versionCode = 100000
-        versionName = "4.6.4"
+        versionCode = 100001
+        versionName = "4.6.5"
         buildConfigField("String", "GITHUB_REPO", "\"jnnjly/evolia\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64", "armeabi-v7a")
+            abiFilters += listOf("arm64-v8a")  // 廿廿点单:只出她手机的架构,包从1023M瘦身
         }
 
         manifestPlaceholders["extractNativeLibs"] = "true"
@@ -76,8 +76,8 @@ android {
         abi {
             isEnable = !isBuildingBundle
             reset()
-            include("arm64-v8a", "x86_64", "armeabi-v7a")
-            isUniversalApk = true
+            include("arm64-v8a")
+            isUniversalApk = false
         }
     }
 
