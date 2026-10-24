@@ -22,6 +22,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlin.uuid.Uuid
 import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.ReasoningLevel
 import me.rerere.ai.core.TokenUsage
@@ -432,7 +433,7 @@ class ChatCompletionsAPI(
 
         return buildJsonObject {
             put("model", params.model.modelId)
-            put("messages", buildMessages(effectiveMessages, host))
+            put("messages", buildMessages(effectiveMessages, host, params.model.id))
 
             if (isModelAllowTemperature(params.model)) {
                 if (params.temperature != null) {
@@ -621,7 +622,7 @@ class ChatCompletionsAPI(
         return !ModelRegistry.OPENAI_O_MODELS.match(model.modelId) && !ModelRegistry.GPT_5.match(model.modelId)
     }
 
-    private fun buildMessages(messages: List<UIMessage>, host: String) = buildJsonArray {
+    private fun buildMessages(messages: List<UIMessage>, host: String, currentModelUuid: Uuid? = null) = buildJsonArray {
         val rawMessages = messages.filter { it.isValidToUpload() }
         val filteredMessages = mutableListOf<UIMessage>()
         var i = 0
@@ -637,6 +638,19 @@ class ChatCompletionsAPI(
                 MessageRole.ASSISTANT -> {
                     val toolCalls = message.getToolCalls()
                     if (toolCalls.isNotEmpty()) {
+                        // 跨模型清洗：当产生该消息的模型与当前请求模型不同时，把工具调用历史降级为纯文本。
+                        // 背景：切换模型后，历史中的 tool_calls/role:"tool" 消息原样发给新渠道，
+                        // 部分渠道后端无法处理会直接报错（如 GPT-5.5 渠道 "content is not iterable"）。
+                        val isCrossModel = currentModelUuid != null && message.modelId != null && message.modelId != currentModelUuid
+                        if (isCrossModel) {
+                            Log.w(TAG, "跨模型工具历史清洗: ${message.modelId} != $currentModelUuid")
+                            val cleanedParts = message.parts.filter { it !is UIMessagePart.ToolCall } +
+                                listOf(UIMessagePart.Text("[跨模型的工具调用记录，已省略]"))
+                            filteredMessages.add(message.copy(parts = cleanedParts))
+                            var k = i + 1
+                            while (k < rawMessages.size && rawMessages[k].role == MessageRole.TOOL) { k++ }
+                            i = k
+                        } else {
                         // 2. 这是一个带工具调用的助手消息，我们需要看后面有没有配套的 Tool 结果
                         val toolResults = mutableListOf<UIMessage>()
                         var j = i + 1
@@ -664,6 +678,7 @@ class ChatCompletionsAPI(
                                 filteredMessages.add(message.copy(parts = cleanedParts))
                             }
                             i = j // 跳过那些无意义的 tool 消息
+                        }
                         }
                     } else {
                         // 普通助手消息
