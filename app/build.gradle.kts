@@ -39,10 +39,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        ndk {
-            abiFilters += listOf("arm64-v8a")  // 廿廿点单:只出她手机的架构,包从1023M瘦身
-        }
-
+        // ndk.abiFilters 已移除:splits.abi 已包含 arm64-v8a,两者并存会撞车(10-24 CI验尸)
         manifestPlaceholders["extractNativeLibs"] = "true"
         // 默认启用
         resValue("bool", "text_selection_enabled", "true")
