@@ -641,7 +641,12 @@ class ChatCompletionsAPI(
                         // 跨模型清洗：当产生该消息的模型与当前请求模型不同时，把工具调用历史降级为纯文本。
                         // 背景：切换模型后，历史中的 tool_calls/role:"tool" 消息原样发给新渠道，
                         // 部分渠道后端无法处理会直接报错（如 GPT-5.5 渠道 "content is not iterable"）。
-                        val isCrossModel = currentModelUuid != null && message.modelId != null && message.modelId != currentModelUuid
+                        // 🐾 扩展清洗(10-24晚)：不只是跨模型——凡是存过档(modelId非空)且带工具结构的历史，
+                        // 一律降级纯文本。背景：部分中转(玖时)的safe normalization拒绝任何含tool结构的
+                        // 请求体，导致调过一次工具后下一轮必报invalid body(廿廿现场20:31)。
+                        // 进行中的工具循环不受影响：in-flight消息无modelId存档标记。
+                        val isCrossModel = message.modelId != null && message.parts.any { it is UIMessagePart.ToolCall } ||
+                            (currentModelUuid != null && message.modelId != null && message.modelId != currentModelUuid)
                         if (isCrossModel) {
                             Log.w(TAG, "跨模型工具历史清洗: ${message.modelId} != $currentModelUuid")
                             val cleanedParts = message.parts.filter { it !is UIMessagePart.ToolCall } +
