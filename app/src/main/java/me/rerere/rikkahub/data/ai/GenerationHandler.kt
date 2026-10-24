@@ -488,8 +488,18 @@ class GenerationHandler(
                         return@forEach
                     }
 
+                    // 🐾 宽容匹配：模型喊错工具名时（消毒前名/大小写/前后缀差异），自动纠偏而不是直接报错
                     val tool = toolsInternal.find { tool -> tool.name == toolCall.toolName }
-                        ?: error("Tool ${toolCall.toolName} not found")
+                        ?: run {
+                            fun norm(s: String) = s.lowercase().replace(Regex("[^a-z0-9_]"), "")
+                            val target = norm(toolCall.toolName)
+                            toolsInternal.find { norm(it.name) == target }
+                                ?: toolsInternal.find {
+                                    val n = norm(it.name)
+                                    (n.isNotEmpty() && target.contains(n)) || (target.isNotEmpty() && n.contains(target))
+                                }
+                            ?: error("Tool ${toolCall.toolName} not found")
+                        }
 
                     Log.d(TAG, "DEBUG: Tool Name = ${toolCall.toolName}")
                     Log.d(TAG, "DEBUG: Raw Arguments String = '${toolCall.arguments}'")
